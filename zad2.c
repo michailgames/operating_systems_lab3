@@ -137,5 +137,9 @@ int main() {
     printf("%d readers created.\n", readers_created);
     printf("Longest waiting writer: %ld usec.\n", longest_writer_waiting);
     printf("Longest waiting reader: %ld usec.\n", longest_reader_waiting);
+    
+    pthread_mutex_destroy(&counter_mutex);
+    pthread_mutex_destroy(&read_mutex);
+    pthread_mutex_destroy(&write_mutex);
     return 0;
 }
