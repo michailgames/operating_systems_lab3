@@ -45,9 +45,11 @@ void writer(int i) {
     struct timeval t1;
     gettimeofday(&t1, NULL);
     pthread_mutex_lock(&read_mutex);
-        pthread_mutex_lock(&write_mutex);
-            play_with_books(i, &t1);
-        pthread_mutex_unlock(&read_mutex);
+    pthread_mutex_lock(&write_mutex);
+    pthread_mutex_unlock(&read_mutex);
+    
+    play_with_books(i, &t1);
+    
     pthread_mutex_unlock(&write_mutex);
 }
 
