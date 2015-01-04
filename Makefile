@@ -6,8 +6,13 @@ zad2: zad2.c
 zad5: zad5.c
 	gcc -std=gnu99 -pthread -Wall -Wextra zad5.c -o zad5
 
-zad9: zad9.c
-	gcc -std=gnu99 -Wall -Wextra zad9.c -o zad9
+zad9: zad9-client zad9-server
+
+zad9-client: zad9-client.c
+	gcc -std=gnu99 -Wall -Wextra zad9-client.c -o zad9-client
+
+zad9-server: zad9-server.c
+	gcc -std=gnu99 -Wall -Wextra zad9-server.c -o zad9-server
     
 clean:
 	find . -maxdepth 1 -type f | grep -v ".c\|Makefile" | xargs rm

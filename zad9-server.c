@@ -4,23 +4,22 @@
 #include <sys/un.h>
 #include <errno.h>
 #include <signal.h>
-
 #include <unistd.h>
 
 #define N 32
-#define MAXMSG 32
+#define MAXMSG 8
 #define FREE 1
 #define ACQUIRED 0
 #define ERROR(str) { fprintf(stderr, "%s: %s\n", str, strerror(errno)); exit(1); }
 
 int sockfd;
-char *filename = "the_server";
+char *filename = "./the_server";
 char buffer[MAXMSG+1];
 
 void sigint_handler() {
     close(sockfd);
     remove(filename);
-    printf("Socket closed.\n");
+    printf("\nSocket closed.\n");
     exit(0);
 }
 
@@ -30,7 +29,7 @@ int main() {
     for(int i = 0; i < N; i++) {
         id_pool[i] = FREE;
     }
-    sockfd = socket(AF_LOCAL, SOCK_DGRAM, 0);
+    sockfd = socket(AF_UNIX, SOCK_DGRAM, 0);
     if(sockfd < 0) {
         ERROR("Creating datagram socket error");
     }
@@ -45,13 +44,18 @@ int main() {
     while(1) {
         struct sockaddr_un client_address;
         socklen_t len = sizeof(client_address);
-        int n = recvfrom(sockfd, buffer, MAXMSG, 0, (struct sockaddr *) &client_address, &len);
+        int n = recvfrom(sockfd, buffer, MAXMSG, 0,
+                (struct sockaddr *) &client_address, &len);
         if(n < 0) {
             ERROR("recvfrom error");
         }
         printf("receive!\n");
         buffer[n] = 0;
         printf("%s\n", buffer);
+        if(sendto(sockfd, buffer, n, 0,
+                (struct sockaddr *) &client_address, len) != n) {
+            ERROR("sendto error");
+        }
     }
     return 0;
 }
