@@ -37,13 +37,16 @@ int main() {
     strcpy(addr.sun_path, filename);
     addr.sun_family = AF_UNIX;
     socklen_t len = sizeof(addr);
+    printf("Usage: -1 to acquire id, <n> to release id number n.\n");
     while(1) {
+        printf("> ");
         fgets(buffer, MAXMSG + 1, stdin);
         int n = strlen(buffer);
         if(sendto(sockfd, buffer, n, 0,
                 (struct sockaddr *) &addr, len) != n) {
             ERROR("sendto error");
         }
+        bzero(&buffer, sizeof(buffer));
         struct sockaddr_un server_address;
         socklen_t len = sizeof(server_address);
         n = recvfrom(sockfd, buffer, MAXMSG, 0,
@@ -51,6 +54,6 @@ int main() {
         if(n < 0) {
             ERROR("recvfrom error");
         }
-        printf("%s", buffer);
+        printf("%s\n", buffer);
     }
 }

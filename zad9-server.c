@@ -5,8 +5,9 @@
 #include <errno.h>
 #include <signal.h>
 #include <unistd.h>
+#include <stdbool.h>
 
-#define N 32
+#define N 8
 #define MAXMSG 8
 #define FREE 1
 #define ACQUIRED 0
@@ -15,6 +16,7 @@
 int sockfd;
 char *filename = "./the_server";
 char buffer[MAXMSG+1];
+int id_pool[N];
 
 void sigint_handler() {
     close(sockfd);
@@ -23,9 +25,29 @@ void sigint_handler() {
     exit(0);
 }
 
+int acquire() {
+    for(int i = 0; i < N; i++) {
+        if(id_pool[i] == FREE) {
+            id_pool[i] = ACQUIRED;
+            return i+1;
+        }
+    }
+    return 0;
+}
+
+bool release(int id) {
+    if(id < 1 || id > N) {
+        return false;
+    }
+    if(id_pool[id-1] == ACQUIRED) {
+        id_pool[id-1] = FREE;
+        return true;
+    }
+    return false;
+}
+
 int main() {
     signal(SIGINT, sigint_handler);
-    int id_pool[N];
     for(int i = 0; i < N; i++) {
         id_pool[i] = FREE;
     }
@@ -49,9 +71,18 @@ int main() {
         if(n < 0) {
             ERROR("recvfrom error");
         }
-        printf("receive!\n");
         buffer[n] = 0;
-        printf("%s\n", buffer);
+        int action = atoi(buffer);
+        int response = -1;
+        if(action == -1) {
+            response = acquire();
+        }
+        else if(action > 0) {
+            response = release(action);
+        }
+        bzero(&buffer, sizeof(buffer));
+        sprintf(buffer, "%d", response);
+        n = strlen(buffer);
         if(sendto(sockfd, buffer, n, 0,
                 (struct sockaddr *) &client_address, len) != n) {
             ERROR("sendto error");
