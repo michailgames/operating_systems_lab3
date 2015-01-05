@@ -15,4 +15,4 @@ zad9-server: zad9-server.c
 	gcc -std=gnu99 -Wall -Wextra zad9-server.c -o zad9-server
     
 clean:
-	find . -maxdepth 1 -type f | grep -v ".c\|Makefile" | xargs rm
+	rm -f zad2 zad5 zad7 zad9-client zad9-server
