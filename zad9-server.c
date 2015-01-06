@@ -17,6 +17,8 @@ int sockfd;
 char *filename = "./the_server";
 char buffer[MAXMSG+1];
 int id_pool[N];
+int free_ids[N];
+int free_ids_number;
 
 void sigint_handler() {
     close(sockfd);
@@ -26,13 +28,13 @@ void sigint_handler() {
 }
 
 int acquire() {
-    for(int i = 0; i < N; i++) {
-        if(id_pool[i] == FREE) {
-            id_pool[i] = ACQUIRED;
-            return i+1;
-        }
+    if(free_ids_number == 0) {
+        return 0;
     }
-    return 0;
+    int id = free_ids[free_ids_number - 1];
+    id_pool[id-1] = ACQUIRED;
+    free_ids_number--;
+    return id;
 }
 
 bool release(int id) {
@@ -41,6 +43,8 @@ bool release(int id) {
     }
     if(id_pool[id-1] == ACQUIRED) {
         id_pool[id-1] = FREE;
+        free_ids[free_ids_number] = id;
+        free_ids_number++;
         return true;
     }
     return false;
@@ -48,9 +52,14 @@ bool release(int id) {
 
 int main() {
     signal(SIGINT, sigint_handler);
+    
+    free_ids_number = 0;
     for(int i = 0; i < N; i++) {
         id_pool[i] = FREE;
+        free_ids[i] = i+1;
+        free_ids_number++;
     }
+    
     sockfd = socket(AF_UNIX, SOCK_DGRAM, 0);
     if(sockfd < 0) {
         ERROR("Creating datagram socket error");
@@ -63,6 +72,7 @@ int main() {
             sizeof(addr.sun_family)) < 0) {
         ERROR("Binding socket error");
     }
+    
     while(1) {
         struct sockaddr_un client_address;
         socklen_t len = sizeof(client_address);
