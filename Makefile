@@ -1,10 +1,13 @@
-all: zad2 zad5 zad7 zad9
+all: zad2 zad5 zad6 zad7 zad9
 
 zad2: zad2.c
 	gcc -std=gnu99 -pthread -Wall -Wextra zad2.c -o zad2
 	
 zad5: zad5.c
 	gcc -std=gnu99 -pthread -Wall -Wextra zad5.c -o zad5
+	
+zad6: zad6.c
+	gcc -std=gnu99 -pthread -Wall -Wextra zad6.c -o zad6
 	
 zad7: zad7.c
 	gcc -std=gnu99 -Wall -Wextra zad7.c -o zad7
