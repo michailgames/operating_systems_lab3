@@ -10,7 +10,7 @@
 #define ERROR(str) { fprintf(stderr, "%s: %s\n", str, strerror(errno)); exit(1); }
 
 int sockfd;
-char *filename = "./the_server";
+const char *filename = "./the_server";
 char buffer[MAXMSG+1];
 
 void sigint_handler() {

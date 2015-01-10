@@ -14,7 +14,7 @@
 #define ERROR(str) { fprintf(stderr, "%s: %s\n", str, strerror(errno)); exit(1); }
 
 int sockfd;
-char *filename = "./the_server";
+const char *filename = "./the_server";
 char buffer[MAXMSG+1];
 int id_pool[N];
 int free_ids[N];
