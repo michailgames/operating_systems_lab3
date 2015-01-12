@@ -11,8 +11,9 @@
 #include <time.h>
 
 #define ERROR(str) { fprintf(stderr, "%s: %s\n", str, strerror(errno)); exit(1); }
-#define CLIENTS_TO_SPAWN 100
-#define MAX_SPAWN_INTERVAL 90000000
+#define CLIENTS_TO_SPAWN 50
+#define MAX_SPAWN_INTERVAL 300000000
+#define MAX_EAT_TIME 950000000
 
 struct restaurant {
 	int waiting;
@@ -25,6 +26,18 @@ const char *queue_sem_name = "/ramen_restaurant_queue_sem";
 const char *global_sem_name = "/ramen_restaurant_global_sem";
 
 int clients_to_spawn = CLIENTS_TO_SPAWN;
+
+void wait(sem_t *sem) {
+	if(sem_wait(sem) < 0) {
+		ERROR("Semaphore wait error");
+	}
+}
+
+void post(sem_t *sem) {
+	if(sem_post(sem) < 0) {
+		ERROR("Semaphore post error");
+	}
+}
 
 void client_function(int number) {
 	sem_t *queue_sem = sem_open(queue_sem_name, 0);
@@ -44,14 +57,56 @@ void client_function(int number) {
 	if(restaurant_p == MAP_FAILED) {
 		ERROR("mmap error");
 	}
+	
 	char buffer[128];
-	sprintf(buffer, "Client #%d coming to restaurant.\n", number);
-	write(STDOUT_FILENO, buffer, strlen(buffer));
-	// TODO - wait, eat and goodbye
+	wait(global_sem);
+		sprintf(buffer, "Client #%d coming to restaurant.\n", number);
+		write(STDOUT_FILENO, buffer, strlen(buffer));
+		restaurant_p->waiting++;
+	post(global_sem);
+
+	wait(queue_sem);
+	
+	wait(global_sem);
+		restaurant_p->waiting--;
+		restaurant_p->eating++;
+		if(restaurant_p->eating == 5) {
+			restaurant_p->must_wait = 1;
+		}
+		sprintf(buffer, "Client #%d starts eating (%d/5).\n",
+					number, restaurant_p->eating);
+		write(STDOUT_FILENO, buffer, strlen(buffer));
+	post(global_sem);
+	
+	struct timespec eat_time;
+	eat_time.tv_sec = 0;
+	eat_time.tv_nsec = rand() % MAX_EAT_TIME;
+	nanosleep(&eat_time, NULL);
+	wait(global_sem);
+		sprintf(buffer, "Client #%d finished eating.\n", number);
+		write(STDOUT_FILENO, buffer, strlen(buffer));
+		restaurant_p->eating--;
+		if(restaurant_p->must_wait == 0) {
+			post(queue_sem);
+		}
+		else if(restaurant_p->eating == 0) {
+			restaurant_p->must_wait = 0;
+			for(int i = 0; i < 5; i++) {
+				post(queue_sem);
+			}
+		}
+	post(global_sem);
+	
+	if(number == CLIENTS_TO_SPAWN) { // UNLINK SHARED OBJECTS
+		if(sem_unlink(queue_sem_name) < 0) ERROR("sem_unlink error");
+		if(sem_unlink(global_sem_name) < 0) ERROR("sem_unlink error");
+		if(shm_unlink(shm_name) < 0) ERROR("shm_unlink error");
+	}	
 }
 
 void spawn_clients(int next_client_number) {
 	if(clients_to_spawn <= 0) {
+		sleep(3);
 		return;
 	}
 	struct timespec wait_time;
@@ -68,15 +123,18 @@ void spawn_clients(int next_client_number) {
 }
 
 int main() {
+	sem_unlink(queue_sem_name);
+	sem_unlink(global_sem_name);
 	srand(time(NULL));
 
-	sem_t *queue_sem = sem_open(queue_sem_name, O_CREAT, 0644, 5);
+	sem_t *queue_sem = sem_open(queue_sem_name, O_CREAT|O_EXCL, 0644, 5);
 	if(queue_sem == SEM_FAILED) {
 		ERROR("Failed to create semaphore");
 	}
-	sem_t *global_sem = sem_open(global_sem_name, O_CREAT, 0644, 1);
+	sem_t *global_sem = sem_open(global_sem_name, O_CREAT|O_EXCL, 0644, 1);
 	if(global_sem == SEM_FAILED) {
 		ERROR("Failed to create semaphore");
+		
 	}
 	int shm = shm_open(shm_name, O_CREAT|O_RDWR, 0644);
 	if(shm < 0) {
@@ -95,6 +153,9 @@ int main() {
 	restaurant_p->must_wait = 0;
 	
 	spawn_clients(1);
-	sleep(1);
+	
+	if(sem_close(global_sem) < 0) ERROR("sem_close error");
+	if(sem_close(queue_sem) < 0) ERROR("sem_close error");
+	
 	return 0;
 }
