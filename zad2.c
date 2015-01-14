@@ -8,23 +8,24 @@
 #include <time.h>
 
 #define WRITERS_PERCENT 33
-#define MAX_SPAWN_INTERVAL 50000
-#define N 20
-#define M 1200
+#define MAX_SPAWN_INTERVAL 500000
+#define N 1200
+#define M 20
 #define WRITER 1
 #define READER 2
 #define ERROR(str) { fprintf(stderr, "%s: %s\n", str, strerror(errno)); exit(1); }
 
 int readers_counter = 0;
-pthread_mutex_t counter_mutex, read_mutex, write_mutex;
+pthread_mutex_t counter_mutex, read_mutex, write_mutex, thread_mutex;
 
-int types[M];
-long waiting_times[M];
-pthread_t threads[M];
-int indices[M];
+int types[N];
+long waiting_times[N];
+pthread_t threads[N];
+int indices[N];
 
 int writers_created = 0;
 int readers_created = 0;
+int active_threads = 0;
 long longest_writer_waiting = 0;
 long longest_reader_waiting = 0;
 
@@ -36,7 +37,7 @@ void play_with_books(int i, struct timeval *t1) {
     
     struct timespec play_time;
     play_time.tv_sec = 0;
-    play_time.tv_nsec = 10000 + rand() % 90000;
+    play_time.tv_nsec = 100000 + rand() % 900000;
     nanosleep(&play_time, NULL);
 }
 
@@ -84,6 +85,9 @@ void *thread_action(void *thread_index_ptr) {
 	else {
 	    reader(i);
 	}
+	pthread_mutex_lock(&thread_mutex);
+	    active_threads--;
+	pthread_mutex_unlock(&thread_mutex);
 	return NULL;
 }
 
@@ -98,25 +102,32 @@ int main() {
     if(pthread_mutex_init(&write_mutex, NULL)) {
         ERROR("Mutex initialization failed");
     }
+    if(pthread_mutex_init(&thread_mutex, NULL)) {
+        ERROR("Mutex initialization failed");
+    }
     
-    for(int i = 0; i < M; i++) {
+    for(int i = 0; i < N; i++) {
         indices[i] = i;
     }
     struct timespec wait_time;
     int n = 0;
-    while(n < M) {
+    while(n < N) {
         wait_time.tv_sec = 0;
         wait_time.tv_nsec = rand() % MAX_SPAWN_INTERVAL;
         nanosleep(&wait_time, NULL);
-        for(int i = 0; i < N; i++) {
-            if(pthread_create(&threads[n], NULL, thread_action, &indices[n])) {
-        		ERROR("Failed to create thread");
-        	}
-        	n++;
-        }
+        pthread_mutex_lock(&thread_mutex);
+	        if(active_threads < M) {   
+	            if(pthread_create(&threads[n], NULL, thread_action, &indices[n])) {
+    		        ERROR("Failed to create thread");
+    	        }
+    	        active_threads++;
+    	        n++;
+	        }
+	    pthread_mutex_unlock(&thread_mutex);
+        
     }
     
-    for(int i = 0; i < M; i++) {
+    for(int i = 0; i < N; i++) {
         if(pthread_join(threads[i], NULL)) {
 			ERROR("Failed to join thread");
 		}
@@ -141,5 +152,6 @@ int main() {
     pthread_mutex_destroy(&counter_mutex);
     pthread_mutex_destroy(&read_mutex);
     pthread_mutex_destroy(&write_mutex);
+    pthread_mutex_destroy(&thread_mutex);
     return 0;
 }
