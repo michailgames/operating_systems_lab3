@@ -16,8 +16,8 @@ int produced[8];
 int indices[8];
 int produced_total = 0;
 int goods_in_shop = 0;
-pthread_mutex_t produce_mutex, consume_mutex;
-pthread_cond_t place_in_shop;
+pthread_mutex_t produce_mutex, shop_mutex, consume_mutex;
+pthread_cond_t place_in_shop, anything_in_shop;
 
 void random_delay() {
     struct timespec wait_time;
@@ -40,11 +40,13 @@ void *producer(void *producer_index_ptr) {
                 should_produce = 0;
             }
             else { 
-                pthread_mutex_lock(&consume_mutex);           
+                pthread_mutex_lock(&shop_mutex);           
                     produced[i]++;
                     produced_total++;
                     goods_in_shop++;
-                pthread_mutex_unlock(&consume_mutex);
+                    pthread_cond_signal(&anything_in_shop);
+                    if(goods_in_shop > N) printf("!too mouch goods in shop!\n");
+                pthread_mutex_unlock(&shop_mutex);
             }
         pthread_mutex_unlock(&produce_mutex);
     }
@@ -57,10 +59,16 @@ void *consumer(void *consumer_index_ptr) {
     printf("Consumer #%d started, target: %d goods.\n", i, hungers[i]);
     while(hungers[i] > 0) {
         random_delay();
-        pthread_mutex_lock(&consume_mutex);           
-            hungers[i]--;
-            goods_in_shop--;
-            pthread_cond_signal(&place_in_shop);
+        pthread_mutex_lock(&consume_mutex);
+        	while(goods_in_shop <= 0) {
+                pthread_cond_wait(&anything_in_shop, &produce_mutex);
+            }
+		    pthread_mutex_lock(&shop_mutex);           
+		        hungers[i]--;
+		        goods_in_shop--;
+		        pthread_cond_signal(&place_in_shop);
+		        if(goods_in_shop < 0) printf("! less than 0 goods in shop!\n");
+		    pthread_mutex_unlock(&shop_mutex);
         pthread_mutex_unlock(&consume_mutex);
     }
     printf("Consumer #%d finished.\n", i);
@@ -75,7 +83,13 @@ int main() {
     if(pthread_mutex_init(&consume_mutex, NULL)) {
         ERROR("Mutex initialization failed");
     }
+    if(pthread_mutex_init(&shop_mutex, NULL)) {
+        ERROR("Mutex initialization failed");
+    }
     if(pthread_cond_init(&place_in_shop, NULL)) {
+        ERROR("Pthread_cond initialization failed");
+    }
+    if(pthread_cond_init(&anything_in_shop, NULL)) {
         ERROR("Pthread_cond initialization failed");
     }
     
@@ -107,7 +121,9 @@ int main() {
     }
     pthread_mutex_destroy(&produce_mutex);
     pthread_mutex_destroy(&consume_mutex);
+    pthread_mutex_destroy(&shop_mutex);
     pthread_cond_destroy(&place_in_shop);
+    pthread_cond_destroy(&anything_in_shop);
     printf("Total production: %d goods.\n", produced_total);
     printf("Left in shop: %d goods.\n", goods_in_shop);
     return 0;
